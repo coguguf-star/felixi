@@ -1,4 +1,4 @@
--- AUTO TRIP v16 + SNAKE MODE
+-- AUTO TRIP v17 + SNAKE MODE (fix respawn)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local plr = Players.LocalPlayer
@@ -64,17 +64,16 @@ local hum = char:WaitForChild("Humanoid")
 local function status(t) lbl.Text = ("%s\nHP %d"):format(t, math.floor(hum.Health)) end
 local function V(x, y, z) return Vector3.new(x, y, z) end
 
--- ===== SNAKE MODE =====
+-- ===== SNAKE MODE (cari karakter tiap frame, anti-stale) =====
 local snakeConn
 
 local function snakeStart()
     if snakeConn or not SNAKE_AKTIF then return end
-    local c = plr.Character
-    if not c then return end
-    local h = c:FindFirstChild("HumanoidRootPart")
-    if not h then return end
     snakeConn = RunService.RenderStepped:Connect(function()
-        if not h or not h.Parent then return end
+        local c = plr.Character
+        if not c then return end
+        local h = c:FindFirstChild("HumanoidRootPart")
+        if not h then return end
         local v = h.AssemblyLinearVelocity
         v = v + Vector3.new((math.random()-0.5)*2*AMP, (math.random()-0.5)*2*AMP, (math.random()-0.5)*2*AMP)
         if NO_FALL and v.Y < -MAX_FALL then
@@ -225,7 +224,24 @@ do
     if bestD > 90 then idx = 1 end
 end
 
+-- refresh karakter kalau respawn
+local function refreshChar()
+    local c = plr.Character
+    if c and c ~= char then
+        char = c
+        hrp = c:WaitForChild("HumanoidRootPart")
+        hum = c:WaitForChild("Humanoid")
+        local bestD = math.huge
+        for j = 1, #PATH do
+            local d = (PATH[j] - hrp.Position).Magnitude
+            if d < bestD then bestD = d; idx = j end
+        end
+        status("respawn - lanjut dari titik " .. idx)
+    end
+end
+
 local function stepOnce()
+    refreshChar()
     if hum.Health <= 0 then status("MATI di titik " .. idx); return end
 
     local p = PATH[idx]
@@ -235,7 +251,6 @@ local function stepOnce()
         if hrp.Position.Y < ROPE_EXIT.Y + 40 then
             status("udah lewat tali")
         else
-            -- MATIIN SNAKE dulu di tali
             snakeStop()
             status("SNAKE OFF - ke tali")
             task.wait(0.8)
@@ -266,7 +281,6 @@ local function stepOnce()
         end
         idx = bestI
 
-        -- NYALAIN SNAKE lagi, tunggu 1.5 detik
         if SNAKE_AKTIF then
             status("SNAKE ON - tunggu 1.5s")
             snakeStart()
@@ -284,7 +298,7 @@ local function stepOnce()
     idx += 1
 end
 
--- ===== START: nyalain snake dulu =====
+-- ===== START =====
 if SNAKE_AKTIF then
     status("SNAKE ON - tunggu 1.5s")
     snakeStart()
@@ -307,6 +321,7 @@ snakeStop()
 status("SELESAI - udah di dasar. pakai relic manual")
 
 plr.CharacterAdded:Connect(function()
+    snakeStop()
     task.wait(1)
     if SNAKE_AKTIF then snakeStart() end
 end)
